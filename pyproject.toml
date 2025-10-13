@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "simple-etl-pipeline"
+version = "0.1.0"
+description = "Simple ETL Pipeline using Pandas and SQLite"
+authors = ["Developer <developer@example.com>"]
+readme = "README.md"
+packages = [{include = "etl_pipeline"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+pandas = "^2.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0.0"
+black = "^23.0.0"
+flake8 = "^6.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+etl-run = "etl_pipeline.main:main"
