@@ -247,3 +247,74 @@ This project is for educational purposes. Feel free to use and modify as needed.
 ### Getting Help
 
 Check the error messages in the console output. The pipeline provides detailed error information to help diagnose issues.
+
+## Running with Airflow (local development)
+
+If you'd like to orchestrate this pipeline with Apache Airflow for scheduled runs, follow these steps to run Airflow locally using a virtual environment and Poetry.
+
+Prerequisites:
+
+- Python 3.9+
+- Poetry
+
+1. Create or activate a Python virtual environment (optional but recommended). You can use your system virtualenv or rely on Poetry's virtual environment:
+
+```bash
+# From the project root
+poetry install
+poetry shell
+```
+
+2. Install Airflow into the same environment. Airflow has specific installation constraints; use the official constraints method. Example (adjust versions as needed):
+
+```bash
+# Set Airflow version and constraint URL. Replace X.Y.Z with a stable Airflow release.
+AIRFLOW_VERSION=2.7.1
+PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+
+pip install "apache-airflow==${AIRFLOW_VERSION}" --constraint "${CONSTRAINT_URL}"
+```
+
+3. Point Airflow to this repository's `dags/` folder. You can either copy the `dags/` folder into your Airflow home `dags/` directory or configure Airflow to use this folder. Example using environment variable:
+
+```bash
+# Set AIRFLOW_HOME to a local folder (optional)
+export AIRFLOW_HOME="$HOME/airflow"
+
+# Configure Airflow to use the project's dags folder
+export AIRFLOW__CORE__DAGS_FOLDER="$(pwd)/dags"
+
+# Initialize the metadata database
+airflow db init
+```
+
+4. Start the scheduler and webserver in separate terminals (or use `airflow standalone` for quick testing):
+
+```bash
+# Start scheduler
+airflow scheduler
+
+# In another terminal, start webserver
+airflow webserver --port 8080
+
+# Alternatively for a quick local dev environment
+airflow standalone
+```
+
+5. Open the Airflow UI at http://localhost:8080, find the DAG `simple_etl_pipeline`, and trigger it manually to test. The DAG runs daily by default.
+
+Notes and recommendations:
+
+- The DAG uses PythonOperator to call the small wrappers in `etl_pipeline/airflow_tasks.py`. Those wrappers use a temporary pickle file at `data/etl_intermediate.pkl` to pass the dataframe between tasks for local testing. Replace this with a cloud object store (S3/GCS) or a staging table for production.
+- Avoid storing large pandas DataFrames in XCom. For production, persist intermediate data to an object store or the database and pass references via XCom.
+- Consider running Airflow inside Docker Compose for an isolated, reproducible environment. The official Airflow repo includes a Docker Compose example.
+- If you plan to scale or operate in production, create a dedicated DAGs repository or package the DAGs with pinning of dependencies and CI/CD deployment to your Airflow environment.
+
+Example: convert intermediate persistence to CSV and use XCom to pass path (recommended change):
+
+1. Write transformed data to `data/transformed.csv` in `transform_task`.
+2. Push the file path to XCom (Airflow will store the string, not the DataFrame).
+3. In `load_task`, pull the file path from XCom and load the CSV.
+
+This reduces memory usage and avoids XCom payload limits.
