@@ -13,16 +13,40 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 import os
+import sys
 
-try:
-    # Local import from the project
-    from etl_pipeline.airflow_tasks import extract_task, transform_task, load_task
-except Exception:
-    # When Airflow imports DAGs, PYTHONPATH may differ; attempt relative import
-    from ..etl_pipeline.airflow_tasks import extract_task, transform_task, load_task
+def _ensure_project_on_path(package_name: str = "etl_pipeline", max_levels: int = 6) -> None:
+    """Find a parent directory that contains `package_name` and add it to sys.path.
+
+    This helps when Airflow loads DAG files from a different folder (for
+    example, the Airflow `dags/` directory) and the project root isn't on
+    PYTHONPATH. We walk upward from the DAG's directory up to `max_levels`
+    looking for a folder that contains the package directory and insert it
+    at the front of sys.path when found.
+    """
+
+    current = os.path.abspath(os.path.dirname(__file__))
+    for _ in range(max_levels):
+        candidate = os.path.join(current, package_name)
+        if os.path.isdir(candidate):
+            if current not in sys.path:
+                sys.path.insert(0, current)
+            return
+        parent = os.path.dirname(current)
+        if parent == current:
+            break
+        current = parent
+
+
+# Ensure the project root is discoverable by Python so we can import the
+# local `etl_pipeline` package when Airflow loads this DAG from a different
+# working directory.
+_ensure_project_on_path()
+
+from etl_pipeline.airflow_tasks import extract_task, transform_task, load_task
 
 from airflow import DAG
-from airflow.operators.python import PythonOperator
+from airflow.providers.standard.operators.python import PythonOperator
 
 
 # Default DAG args
@@ -40,7 +64,7 @@ with DAG(
     dag_id='simple_etl_pipeline',
     default_args=default_args,
     description='A simple ETL DAG using the project pipeline',
-    schedule_interval='@daily',
+    schedule='@daily',
     start_date=datetime(2025, 1, 1),
     catchup=False,
     tags=['example', 'etl'],
