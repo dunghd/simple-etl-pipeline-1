@@ -14,8 +14,21 @@ Design notes:
 from __future__ import annotations
 
 import os
+import sys
 import pickle
 from typing import Any, Dict
+
+# On macOS Airflow runs can sometimes hit low-level crashes in C-extensions when
+# processes are forked. The Airflow logs recommend enabling the faulthandler and
+# disabling system proxy lookups which can trigger unsafe behavior on macOS.
+# Set these early (before importing libraries like pandas) so they take effect
+# for any native code those libraries may load. Don't override variables the
+# user has explicitly set.
+if sys.platform == "darwin":
+    os.environ.setdefault("PYTHONFAULTHANDLER", "true")
+    # Disable proxy lookups which may cause macOS library calls that aren't fork-safe
+    os.environ.setdefault("no_proxy", "*")
+    os.environ.setdefault("NO_PROXY", "*")
 
 import pandas as pd
 
