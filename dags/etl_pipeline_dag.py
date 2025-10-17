@@ -64,8 +64,15 @@ with DAG(
     dag_id='simple_etl_pipeline',
     default_args=default_args,
     description='A simple ETL DAG using the project pipeline',
-    schedule='@daily',
-    start_date=datetime(2025, 1, 1),
+    # schedule can be controlled via environment variable ETL_PIPELINE_SCHEDULE
+    # - if set to 'every_minute' (or 'minute') it will use '*/1 * * * *'
+    # - if set to any other non-empty value it's used directly (allowing cron or '@daily')
+    # - if not set, falls back to '@daily'
+    schedule=(os.getenv('ETL_PIPELINE_SCHEDULE', '').strip().lower() in ('every_minute', 'minute') and '*/1 * * * *')
+             or os.getenv('ETL_PIPELINE_SCHEDULE')
+             or '@daily',
+    # use a recent start_date; with catchup=False this will start immediately
+    start_date=datetime(2025, 10, 17),
     catchup=False,
     tags=['example', 'etl'],
 ) as dag:
